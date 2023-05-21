@@ -1,5 +1,8 @@
 package com.tanguyantoine.react;
 
+import android.app.Application;
+import android.os.Bundle;
+import android.app.Activity;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -26,6 +29,7 @@ public class MusicControlNotification {
     protected static final String REMOVE_NOTIFICATION = "music_control_remove_notification";
     protected static final String MEDIA_BUTTON = "music_control_media_button";
     protected static final String PACKAGE_NAME = "music_control_package_name";
+
 
     private final ReactApplicationContext context;
     private final MusicControlModule module;
@@ -205,8 +209,52 @@ public class MusicControlNotification {
         return new NotificationCompat.Action(icon, title, i);
     }
 
-    public static class NotificationService extends Service {
+    public static class NotificationService extends Service implements Application.ActivityLifecycleCallbacks {
+        private static boolean isAppInBackground = false;
 
+        private int numStarted = 0;
+    
+        @Override
+        public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+            // Implementation for onActivityCreated
+        }
+
+        @Override
+        public void onActivityStarted(Activity activity) {
+            if (numStarted == 0) {
+                // app went to foreground
+                isAppInBackground = false;
+            }
+            numStarted++;
+        }
+
+        @Override
+        public void onActivityResumed(Activity activity) {
+            // Implementation for onActivityResumed
+        }
+
+        @Override
+        public void onActivityPaused(Activity activity) {
+            // Implementation for onActivityPaused
+        }    
+    
+        @Override
+        public void onActivityStopped(Activity activity) {
+            numStarted--;
+            if (numStarted == 0) {
+                // app went to background
+                isAppInBackground = true;
+            }
+        }
+
+        @Override
+        public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
+            // Implementation for onActivitySaveInstanceState
+        }
+
+        @Override
+        public void onActivityDestroyed(Activity activity) { }
+        
         private final LocalBinder binder = new LocalBinder();
 
         public class LocalBinder extends Binder {
@@ -232,22 +280,29 @@ public class MusicControlNotification {
         }
 
         public void forceForeground() {
-            // API lower than 26 do not need this work around.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                try {
-                    Intent intent = new Intent(MusicControlNotification.NotificationService.this,
-                            MusicControlNotification.NotificationService.class);
-                    // service has already been initialized.
-                    // startForeground method should be called within 5 seconds.
-                    ContextCompat.startForegroundService(MusicControlNotification.NotificationService.this, intent);
+                // Check if the app is in the background. If it is, return.
+                if (isAppInBackground) {
+                    return;
+                }
 
-                    if (MusicControlModule.INSTANCE == null) {
+                Intent intent = new Intent(MusicControlNotification.NotificationService.this,
+                        MusicControlNotification.NotificationService.class);
+                
+                // Start service in foreground
+                ContextCompat.startForegroundService(MusicControlNotification.NotificationService.this, intent);
+                if (MusicControlModule.INSTANCE == null) {
+                    try {
                         MusicControlModule.INSTANCE.init();
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
                     }
-
+                }
+                try {
                     notification = MusicControlModule.INSTANCE.notification
                             .prepareNotification(MusicControlModule.INSTANCE.nb, false);
-                    // call startForeground just after startForegroundService.
+                    
+                    // Call startForeground to promote the service to a foreground service
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         // add foreground service type for Android >= Q
                         startForeground(MusicControlModule.INSTANCE.getNotificationId(), notification,
@@ -282,6 +337,9 @@ public class MusicControlNotification {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
+
+            // Register the ActivityLifecycleCallbacks
+            getApplication().registerActivityLifecycleCallbacks(this);
         }
 
         @Override
@@ -310,32 +368,35 @@ public class MusicControlNotification {
             }
             return START_NOT_STICKY;
         }
-
+        
         @Override
         public void onTaskRemoved(Intent rootIntent) {
             // Destroy the notification and sessions when the task is removed (closed,
             // killed, etc)
             if (MusicControlModule.INSTANCE != null) {
                 MusicControlModule.INSTANCE.destroy();
+                MusicControlModule.INSTANCE = null; // Set instance to null after destroy
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 stopForeground(true);
             }
             stopSelf(); // Stop the service as we won't need it anymore
         }
-
+        
         @Override
         public void onDestroy() {
-
             if (MusicControlModule.INSTANCE != null) {
                 MusicControlModule.INSTANCE.destroy();
+                MusicControlModule.INSTANCE = null; // Set instance to null after destroy
             }
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 stopForeground(true);
             }
-
             stopSelf();
+
+            // Unregister the ActivityLifecycleCallbacks
+            getApplication().unregisterActivityLifecycleCallbacks(this);
         }
+        
     }
 }
