@@ -14,7 +14,11 @@ import android.os.Build;
 import android.os.IBinder;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.view.KeyEvent;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import android.util.Log;
 
 import com.facebook.react.bridge.ReactApplicationContext;
 
@@ -30,13 +34,18 @@ public class MusicControlNotification {
     protected static final String MEDIA_BUTTON = "music_control_media_button";
     protected static final String PACKAGE_NAME = "music_control_package_name";
 
-
     private final ReactApplicationContext context;
     private final MusicControlModule module;
 
     private int smallIcon;
     private int customIcon;
     private NotificationCompat.Action play, pause, stop, next, previous, skipForward, skipBackward;
+    private static boolean isAppInBackground = false;
+
+    public static boolean isAppInForeground() {
+        Log.d("RNMC", "*** INFO: isAppInForeground(): " + Boolean.toString(!isAppInBackground) + " ***");
+        return !isAppInBackground;
+    }
 
     public MusicControlNotification(MusicControlModule module, ReactApplicationContext context) {
         this.context = context;
@@ -210,52 +219,77 @@ public class MusicControlNotification {
     }
 
     public static class NotificationService extends Service implements Application.ActivityLifecycleCallbacks {
-        private static boolean isAppInBackground = false;
 
-        private int numStarted = 0;
-    
-        @Override
-        public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
-            // Implementation for onActivityCreated
-        }
-
-        @Override
-        public void onActivityStarted(Activity activity) {
-            if (numStarted == 0) {
-                // app went to foreground
-                isAppInBackground = false;
-            }
-            numStarted++;
-        }
-
-        @Override
-        public void onActivityResumed(Activity activity) {
-            // Implementation for onActivityResumed
-        }
-
-        @Override
-        public void onActivityPaused(Activity activity) {
-            // Implementation for onActivityPaused
-        }    
-    
-        @Override
-        public void onActivityStopped(Activity activity) {
-            numStarted--;
-            if (numStarted == 0) {
-                // app went to background
-                isAppInBackground = true;
-            }
-        }
-
-        @Override
-        public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
-            // Implementation for onActivitySaveInstanceState
-        }
-
-        @Override
-        public void onActivityDestroyed(Activity activity) { }
-        
         private final LocalBinder binder = new LocalBinder();
+        private MusicControlModule musicControlModule;
+
+        public void initNotification() {
+            if (MusicControlModule.INSTANCE == null) {
+                try {
+                    MusicControlModule.INSTANCE.init();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
+
+        public void setMusicControlModule(MusicControlModule musicControlModule) {
+            this.musicControlModule = musicControlModule;
+        }
+
+        @Override
+        public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
+            Log.d("RNMC", "*** INFO: onActivityCreated ***");
+            Log.d("RNMC", "*** INFO: isAppInBackground: " + Boolean.toString(isAppInBackground) + " ***");
+
+        }
+
+        @Override
+        public void onActivityStarted(@NonNull Activity activity) {
+            Log.d("RNMC", "*** INFO: onActivityStarted ***");
+            isAppInBackground = false;
+            Log.d("RNMC", "*** INFO: isAppInBackground: " + Boolean.toString(isAppInBackground) + " ***");
+        }
+
+        @Override
+        public void onActivityResumed(@NonNull Activity activity) {
+            Log.d("RNMC", "*** INFO: onActivityResumed ***");
+            Log.d("RNMC", "*** INFO: isAppInBackground: " + Boolean.toString(isAppInBackground) + " ***");
+            // TODO: remap
+            // if (musicControlModule != null) {
+            // musicControlModule.appReturningToForeground();
+            // }
+        }
+
+        @Override
+        public void onActivityPaused(@NonNull Activity activity) {
+            Log.d("RNMC", "*** INFO: onActivityPaused ***");
+            Log.d("RNMC", "*** INFO: isAppInBackground: " + Boolean.toString(isAppInBackground) + " ***");
+
+        }
+
+        @Override
+        public void onActivityStopped(@NonNull Activity activity) {
+            Log.d("RNMC", "*** INFO: onActivityStopped ***");
+            isAppInBackground = true;
+            Log.d("RNMC", "*** INFO: isAppInBackground: " + Boolean.toString(isAppInBackground) + " ***");
+
+        }
+
+        @Override
+        public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) {
+            // Implementation for onActivitySaveInstanceState
+            Log.d("RNMC", "*** INFO: onActivitySaveInstanceState ***");
+            Log.d("RNMC", "*** INFO: isAppInBackground: " + Boolean.toString(isAppInBackground) + " ***");
+
+        }
+
+        @Override
+        public void onActivityDestroyed(@NonNull Activity activity) {
+            Log.d("RNMC", "*** INFO: onActivityDestroyed ***");
+            Log.d("RNMC", "*** INFO: isAppInBackground: " + Boolean.toString(isAppInBackground) + " ***");
+
+        }
 
         public class LocalBinder extends Binder {
 
@@ -283,25 +317,28 @@ public class MusicControlNotification {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 // Check if the app is in the background. If it is, return.
                 if (isAppInBackground) {
+                    Log.d("RNMC", "*** APP IN BACKGROUND");
                     return;
                 }
 
                 Intent intent = new Intent(MusicControlNotification.NotificationService.this,
                         MusicControlNotification.NotificationService.class);
-                
+
                 // Start service in foreground
                 ContextCompat.startForegroundService(MusicControlNotification.NotificationService.this, intent);
                 if (MusicControlModule.INSTANCE == null) {
                     try {
+                        Log.d("RNMC", "*** INITIALIZING MCM INSTANCE");
                         MusicControlModule.INSTANCE.init();
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
                 }
+
                 try {
                     notification = MusicControlModule.INSTANCE.notification
                             .prepareNotification(MusicControlModule.INSTANCE.nb, false);
-                    
+
                     // Call startForeground to promote the service to a foreground service
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         // add foreground service type for Android >= Q
@@ -321,10 +358,18 @@ public class MusicControlNotification {
         @Override
         public void onCreate() {
             super.onCreate();
+            getApplication().registerActivityLifecycleCallbacks(this);
+
             try {
+                Log.d("RNMC", "ON CREATE NOTIF");
+
                 if (MusicControlModule.INSTANCE == null) {
                     MusicControlModule.INSTANCE.init();
                 }
+                // TODO: remap
+
+                // // Set the MusicControlModule instance for the service
+                // setMusicControlModule(MusicControlModule.INSTANCE);
                 notification = MusicControlModule.INSTANCE.notification
                         .prepareNotification(MusicControlModule.INSTANCE.nb, false);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -337,9 +382,6 @@ public class MusicControlNotification {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
-
-            // Register the ActivityLifecycleCallbacks
-            getApplication().registerActivityLifecycleCallbacks(this);
         }
 
         @Override
@@ -368,7 +410,7 @@ public class MusicControlNotification {
             }
             return START_NOT_STICKY;
         }
-        
+
         @Override
         public void onTaskRemoved(Intent rootIntent) {
             // Destroy the notification and sessions when the task is removed (closed,
@@ -382,9 +424,11 @@ public class MusicControlNotification {
             }
             stopSelf(); // Stop the service as we won't need it anymore
         }
-        
+
         @Override
         public void onDestroy() {
+            Log.d("RNMC", "ON DESTROY NOTIF");
+
             if (MusicControlModule.INSTANCE != null) {
                 MusicControlModule.INSTANCE.destroy();
                 MusicControlModule.INSTANCE = null; // Set instance to null after destroy
@@ -392,11 +436,10 @@ public class MusicControlNotification {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 stopForeground(true);
             }
-            stopSelf();
 
             // Unregister the ActivityLifecycleCallbacks
             getApplication().unregisterActivityLifecycleCallbacks(this);
         }
-        
+
     }
 }
