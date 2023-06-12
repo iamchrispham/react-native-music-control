@@ -219,8 +219,6 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
                 } else {
                     context.startService(myIntent);
                 }
-            } else {
-                context.startService(myIntent);
             }
 
             context.registerComponentCallbacks(this);
