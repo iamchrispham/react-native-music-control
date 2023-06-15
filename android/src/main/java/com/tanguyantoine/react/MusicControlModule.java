@@ -177,7 +177,7 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
             session.setCallback(new MediaSessionCallback(emitter));
 
             volume = new MusicControlVolumeListener(context, emitter, true, 100, 100);
-            if (remoteVolume) {
+            if (volume != null && remoteVolume) {
                 session.setPlaybackToRemote(volume);
             } else {
                 session.setPlaybackToLocal(AudioManager.STREAM_MUSIC);
@@ -219,6 +219,8 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
                 } else {
                     context.startService(myIntent);
                 }
+            } else {
+                context.startService(myIntent);
             }
 
             context.registerComponentCallbacks(this);
@@ -322,10 +324,20 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
 
     @ReactMethod
     public void observeAudioInterruptions(boolean enable) {
-        if (enable) {
-            afListener.requestAudioFocus();
-        } else {
-            afListener.abandonAudioFocus();
+        try {
+            if (afListener != null) {
+                if (enable) {
+                    afListener.requestAudioFocus();
+                } else {
+                    afListener.abandonAudioFocus();
+                }
+            } else {
+                throw new NullPointerException("afListener is null");
+            }
+        } catch (NullPointerException e) {
+            // Handle the exception here
+            // Log an error, display a message, or take appropriate action
+            e.printStackTrace();
         }
     }
 
@@ -491,10 +503,12 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
 
             session.setRatingType(ratingType);
 
-            if (remoteVolume) {
-                session.setPlaybackToRemote(volume.create(null, maxVol, vol));
-            } else {
-                session.setPlaybackToLocal(AudioManager.STREAM_MUSIC);
+            if (volume != null) {
+                if (remoteVolume) {
+                    session.setPlaybackToRemote(volume.create(null, maxVol, vol));
+                } else {
+                    session.setPlaybackToLocal(AudioManager.STREAM_MUSIC);
+                }
             }
         }
 
@@ -512,7 +526,8 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
 
         if (notification != null)
             notification.hide();
-        session.setActive(false);
+        if (session != null)
+            session.setActive(false);
     }
 
     @ReactMethod
@@ -621,7 +636,7 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
 
                 if (image instanceof BitmapDrawable) {
                     bitmap = ((BitmapDrawable) image).getBitmap();
-                } else {
+                } else if (image != null) {
                     bitmap = BitmapFactory.decodeFile(url);
                 }
             } else {
