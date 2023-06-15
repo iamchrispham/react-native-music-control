@@ -4,6 +4,7 @@ import android.content.Context;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Build;
+import android.util.Log;
 
 import com.facebook.react.bridge.ReactApplicationContext;
 
