@@ -213,14 +213,22 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
 
             afListener = new MusicControlAudioFocusListener(context, emitter, volume);
 
-            if (MusicControlNotification.isAppInForeground()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // For Android 8.0 (Oreo) and above, try to bind the service
+                try {
+                    context.bindService(myIntent, connection, Context.BIND_AUTO_CREATE);
+                } catch (Exception ignored) {
                     ContextCompat.startForegroundService(context, myIntent);
-                } else {
-                    context.startService(myIntent);
                 }
             } else {
-                context.startService(myIntent);
+                // For Android versions below 8.0
+                try {
+                    context.startService(myIntent);
+                } catch (Exception e) {
+                    // Handle exception or try an alternative approach
+                    // For example, binding to the service as a fallback
+                    context.bindService(myIntent, connection, Context.BIND_AUTO_CREATE);
+                }
             }
 
             context.registerComponentCallbacks(this);
