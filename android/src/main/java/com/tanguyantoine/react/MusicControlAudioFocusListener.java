@@ -32,6 +32,19 @@ public class MusicControlAudioFocusListener implements AudioManager.OnAudioFocus
 
     @Override
     public void onAudioFocusChange(int focusChange) {
+
+        if (mAudioManager == null) {
+            Log.e("RNMC", "AudioManager is not initialized in onAudioFocusChange");
+            if (emitter != null) {
+                try {
+                    emitter.onStop();
+                } catch (Exception e) {
+                    Log.e("RNMC", "Error calling onStop in emitter", e);
+                }
+            }
+            return;
+        }
+
         if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
             abandonAudioFocus();
             mPlayOnAudioFocus = false;

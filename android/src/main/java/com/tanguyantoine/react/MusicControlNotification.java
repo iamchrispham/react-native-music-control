@@ -157,18 +157,33 @@ public class MusicControlNotification {
     }
 
     public synchronized void show(NotificationCompat.Builder builder, boolean isPlaying) {
-        NotificationManagerCompat.from(context).notify(MusicControlModule.INSTANCE.getNotificationId(),
-                prepareNotification(builder, isPlaying));
+        try {
+            if (MusicControlModule.INSTANCE != null) {
+                NotificationManagerCompat.from(context).notify(MusicControlModule.INSTANCE.getNotificationId(),
+                        prepareNotification(builder, isPlaying));
+            } else {
+                Log.e("MusicControlNotification", "MusicControlModule.INSTANCE is null in show()");
+                throw new IllegalStateException(
+                        "MusicControlModule.INSTANCE is null in show(); Music Notification most likely was killed");
+
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 
     public void hide() {
-        NotificationManagerCompat.from(context).cancel(MusicControlModule.INSTANCE.getNotificationId());
+        if (MusicControlModule.INSTANCE != null) {
+            NotificationManagerCompat.from(context).cancel(MusicControlModule.INSTANCE.getNotificationId());
+        } else {
+            Log.e("MusicControlNotification", "MusicControlModule.INSTANCE is null in hide()");
+        }
 
         try {
             Intent myIntent = new Intent(context, MusicControlNotification.NotificationService.class);
             context.stopService(myIntent);
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            Log.e("MusicControlNotification", "Error stopping service: " + e.getMessage());
         }
     }
 
@@ -265,17 +280,22 @@ public class MusicControlNotification {
 
         public void forceForeground() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Check if the app is in the background. If it is, return.
-                if (isAppInBackground) {
-                    Log.d("RNMC", "*** APP IN BACKGROUND");
-                    return;
-                }
 
                 Intent intent = new Intent(MusicControlNotification.NotificationService.this,
                         MusicControlNotification.NotificationService.class);
 
-                // Start service in foreground
-                ContextCompat.startForegroundService(MusicControlNotification.NotificationService.this, intent);
+                try {
+                    if (!isAppInForeground()) {
+                        Log.d("RNMC", "*** APP NOT IN FOREGROUND, CANNOT START FOREGROUND SERVICE ***");
+                        throw new IllegalStateException("App is not in the foreground");
+                    }
+                    // Start service in foreground
+                    ContextCompat.startForegroundService(MusicControlNotification.NotificationService.this, intent);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    return; // Optionally return from the method if an exception is caught
+                }
+
                 if (MusicControlModule.INSTANCE == null) {
                     try {
                         Log.d("RNMC", "*** INITIALIZING MCM INSTANCE");
@@ -286,7 +306,7 @@ public class MusicControlNotification {
                 }
 
                 try {
-                    notification = MusicControlModule.INSTANCE.notification
+                    Notification notification = MusicControlModule.INSTANCE.notification
                             .prepareNotification(MusicControlModule.INSTANCE.nb, false);
 
                     // Call startForeground to promote the service to a foreground service
