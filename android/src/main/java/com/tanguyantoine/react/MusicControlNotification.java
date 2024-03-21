@@ -284,18 +284,6 @@ public class MusicControlNotification {
                 Intent intent = new Intent(MusicControlNotification.NotificationService.this,
                         MusicControlNotification.NotificationService.class);
 
-                try {
-                    if (!isAppInForeground()) {
-                        Log.d("RNMC", "*** APP NOT IN FOREGROUND, CANNOT START FOREGROUND SERVICE ***");
-                        throw new IllegalStateException("App is not in the foreground");
-                    }
-                    // Start service in foreground
-                    ContextCompat.startForegroundService(MusicControlNotification.NotificationService.this, intent);
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    return; // Optionally return from the method if an exception is caught
-                }
-
                 if (MusicControlModule.INSTANCE == null) {
                     try {
                         Log.d("RNMC", "*** INITIALIZING MCM INSTANCE");
@@ -306,20 +294,33 @@ public class MusicControlNotification {
                 }
 
                 try {
-                    Notification notification = MusicControlModule.INSTANCE.notification
-                            .prepareNotification(MusicControlModule.INSTANCE.nb, false);
+                    if (!isAppInForeground()) {
+                        Log.d("RNMC", "*** APP NOT IN FOREGROUND, CANNOT START FOREGROUND SERVICE ***");
+                        throw new IllegalStateException("App is not in the foreground");
+                    }
+                    // Start service in foreground
+                    ContextCompat.startForegroundService(MusicControlNotification.NotificationService.this, intent);
 
-                    // Call startForeground to promote the service to a foreground service
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        // add foreground service type for Android >= Q
-                        startForeground(MusicControlModule.INSTANCE.getNotificationId(), notification,
-                                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-                    } else {
-                        startForeground(MusicControlModule.INSTANCE.getNotificationId(), notification);
+                    try {
+                        Notification notification = MusicControlModule.INSTANCE.notification
+                                .prepareNotification(MusicControlModule.INSTANCE.nb, false);
+
+                        // Call startForeground to promote the service to a foreground service
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            // add foreground service type for Android >= Q
+                            startForeground(MusicControlModule.INSTANCE.getNotificationId(), notification,
+                                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                        } else {
+                            startForeground(MusicControlModule.INSTANCE.getNotificationId(), notification);
+                        }
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
                     }
                 } catch (Exception ex) {
                     ex.printStackTrace();
+                    return; // Optionally return from the method if an exception is caught
                 }
+
             }
         }
 

@@ -24,9 +24,7 @@ public class MusicControlAudioFocusListener implements AudioManager.OnAudioFocus
 
         this.mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         if (this.mAudioManager == null) {
-            // Log an error or notify the user
             Log.e("MusicControl", "System service AUDIO_SERVICE is not available");
-            // Alternatively, handle this error in a way that is appropriate for your app
         }
     }
 
@@ -45,25 +43,32 @@ public class MusicControlAudioFocusListener implements AudioManager.OnAudioFocus
             return;
         }
 
-        if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
-            abandonAudioFocus();
-            mPlayOnAudioFocus = false;
-            emitter.onStop();
-        } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-            if (MusicControlModule.INSTANCE.isPlaying()) {
-                mPlayOnAudioFocus = true;
-                emitter.onPause();
-            }
-        } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
-            volume.setCurrentVolume(40);
-        } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
-            if (volume.getCurrentVolume() != 100) {
-                volume.setCurrentVolume(100);
-            }
-            if (mPlayOnAudioFocus) {
-                emitter.onPlay();
-            }
-            mPlayOnAudioFocus = false;
+        switch (focusChange) {
+            case AudioManager.AUDIOFOCUS_LOSS:
+                abandonAudioFocus();
+                mPlayOnAudioFocus = false;
+                if (emitter != null) {
+                    emitter.onStop();
+                }
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                if (MusicControlModule.INSTANCE != null && MusicControlModule.INSTANCE.isPlaying()) {
+                    mPlayOnAudioFocus = true;
+                    emitter.onPause();
+                }
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                volume.setCurrentVolume(40);
+                break;
+            case AudioManager.AUDIOFOCUS_GAIN:
+                if (volume.getCurrentVolume() != 100) {
+                    volume.setCurrentVolume(100);
+                }
+                if (mPlayOnAudioFocus && MusicControlModule.INSTANCE != null) {
+                    emitter.onPlay();
+                }
+                mPlayOnAudioFocus = false;
+                break;
         }
     }
 
