@@ -37,7 +37,8 @@
 		"build:android": "cd ./android && ./gradlew assembleDebug",
 		"test": "yarn build:all",
 		"semantic-release:ci": "semantic-release --no-ci",
-		"semantic-release": "semantic-release"
+		"semantic-release": "semantic-release",
+		"release": "sh release.sh"
 	},
 	"devDependencies": {
 		"@semantic-release/changelog": "^6.0.3",
