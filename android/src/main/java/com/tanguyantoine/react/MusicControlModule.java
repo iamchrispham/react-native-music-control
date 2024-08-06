@@ -207,26 +207,30 @@ public class MusicControlModule extends ReactContextBaseJavaModule implements Co
             filter.addAction(Intent.ACTION_MEDIA_BUTTON);
             filter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
             receiver = new MusicControlReceiver(this, context);
-            context.registerReceiver(receiver, filter);
+
+            // Adjusted registration of the receiver
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13 (API level 33)
+                context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { // Android 8.0 (API level 26)
+                context.registerReceiver(receiver, filter);
+            } else { // Older versions of Android
+                context.registerReceiver(receiver, filter);
+            }
 
             Intent myIntent = new Intent(context, MusicControlNotification.NotificationService.class);
 
             afListener = new MusicControlAudioFocusListener(context, emitter, volume);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // For Android 8.0 (Oreo) and above, try to bind the service
                 try {
                     context.bindService(myIntent, connection, Context.BIND_AUTO_CREATE);
                 } catch (Exception ignored) {
                     ContextCompat.startForegroundService(context, myIntent);
                 }
             } else {
-                // For Android versions below 8.0
                 try {
                     context.startService(myIntent);
                 } catch (Exception e) {
-                    // Handle exception or try an alternative approach
-                    // For example, binding to the service as a fallback
                     context.bindService(myIntent, connection, Context.BIND_AUTO_CREATE);
                 }
             }
